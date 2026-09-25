@@ -1,0 +1,92 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Paw Aid</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="navbar">
+  <div class="container">
+    <a href="index.html" class="brand"><span class="paw">🐕</span> Paw Aid</a>
+    <ul class="nav-links">
+      <li><a href="citizen-dashboard.html" class="active">Dashboard</a></li>
+      <li><a href="my-reports.html">My Reports</a></li>
+      <li><a href="report-dog.html">Report a Dog</a></li>
+    </ul>
+    <div class="nav-actions">
+      <a href="index.html" class="btn btn-ghost">Log Out</a>
+    </div>
+    <button class="nav-toggle" aria-label="Menu">☰</button>
+  </div>
+</header>
+
+<div class="dash-shell">
+  <aside class="sidebar">
+    <div class="user-chip">
+      <div class="avatar">Y</div>
+      <div>
+        <div class="name">You</div>
+        <div class="role">Citizen</div>
+      </div>
+    </div>
+    <ul class="side-nav">
+      <li><a href="citizen-dashboard.html" class="active">🏠 Overview</a></li>
+      <li><a href="my-reports.html">📋 My Reports</a></li>
+      <li><a href="report-dog.html">➕ Report a Dog</a></li>
+      <li><a href="track-reports.html">📍 Track a Report</a></li>
+      <li><a href="index.html">🚪 Log Out</a></li>
+    </ul>
+  </aside>
+
+  <main class="dash-main" id="citizenStats">
+    <div class="dash-head">
+      <div>
+        <h1 style="font-size:1.8rem;">Welcome back 👋</h1>
+        <p>Here's a summary of your rescue activity.</p>
+      </div>
+      <a href="report-dog.html" class="btn btn-primary">+ New Report</a>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Total reports</div>
+        <div class="kpi-value" id="kpiTotal">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Pending</div>
+        <div class="kpi-value" id="kpiPending">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">In progress</div>
+        <div class="kpi-value" id="kpiProgress">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Resolved</div>
+        <div class="kpi-value" id="kpiResolved">0</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Recent reports</h3>
+        <a href="my-reports.html" style="font-size:0.85rem;font-weight:600;color:var(--orange-700);">View all →</a>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Description</th><th>Date</th><th>Status</th></tr>
+          </thead>
+          <tbody id="recentReportsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

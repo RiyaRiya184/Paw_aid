@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log In — Paw Aid</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="navbar">
+  <div class="container">
+    <a href="index.html" class="brand"><span class="paw">🐕</span> Paw Aid</a>
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="report-dog.html">Report a Dog</a></li>
+      <li><a href="track-reports.html">Track a Report</a></li>
+    </ul>
+    <div class="nav-actions">
+      <a href="register.html" class="btn btn-primary">Register</a>
+    </div>
+    <button class="nav-toggle" aria-label="Menu">☰</button>
+  </div>
+</header>
+
+<main class="auth-shell">
+  <div class="auth-card">
+    <div class="auth-head">
+      <div class="paw">🐾</div>
+      <h1 style="font-size:1.7rem;">Welcome back</h1>
+      <p>Log in to continue helping street dogs.</p>
+    </div>
+
+    <div class="role-toggle" data-role="citizen">
+      <button type="button" class="active" data-role="citizen">Citizen</button>
+      <button type="button" data-role="ngo">NGO</button>
+      <button type="button" data-role="admin">Admin</button>
+    </div>
+
+    <form id="loginForm">
+      <div class="field">
+        <label for="email">Email address</label>
+        <input type="email" id="email" placeholder="you@example.com" required>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="••••••••" required>
+      </div>
+      <div class="flex-between" style="margin-bottom:22px;">
+        <label class="checkbox-row">
+          <input type="checkbox" style="width:auto;">
+          Remember me
+        </label>
+        <a href="#" style="font-size:0.85rem;font-weight:600;color:var(--orange-700);">Forgot password?</a>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Log In</button>
+    </form>
+
+    <p class="form-foot">Don't have an account? <a href="register.html">Register here</a></p>
+  </div>
+</main>
+
+<script src="script.js"></script>
+</body>
+</html>

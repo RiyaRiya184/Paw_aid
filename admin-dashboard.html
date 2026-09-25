@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard — Paw Aid</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="navbar">
+  <div class="container">
+    <a href="index.html" class="brand"><span class="paw">🐕</span> Paw Aid</a>
+    <ul class="nav-links">
+      <li><a href="admin-dashboard.html" class="active">Admin</a></li>
+    </ul>
+    <div class="nav-actions">
+      <a href="index.html" class="btn btn-ghost">Log Out</a>
+    </div>
+    <button class="nav-toggle" aria-label="Menu">☰</button>
+  </div>
+</header>
+
+<div class="dash-shell">
+  <aside class="sidebar">
+    <div class="user-chip">
+      <div class="avatar">A</div>
+      <div>
+        <div class="name">Admin</div>
+        <div class="role">Platform Owner</div>
+      </div>
+    </div>
+    <ul class="side-nav">
+      <li><a href="#" data-view="overview" class="active">📊 Overview</a></li>
+      <li><a href="#" data-view="reports">📋 All Reports</a></li>
+      <li><a href="#" data-view="ngos">🏢 NGOs</a></li>
+      <li><a href="#" data-view="users">👥 Users</a></li>
+      <li><a href="index.html">🚪 Log Out</a></li>
+    </ul>
+  </aside>
+
+  <main class="dash-main">
+    <div class="dash-head">
+      <div>
+        <h1 style="font-size:1.8rem;" id="adminViewTitle">Admin Overview</h1>
+        <p id="adminViewSubtitle">Platform-wide activity across all citizens and NGOs.</p>
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Total reports</div>
+        <div class="kpi-value" id="kpiAdminReports">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Pending review</div>
+        <div class="kpi-value" id="kpiAdminPending">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Resolved</div>
+        <div class="kpi-value" id="kpiAdminResolved">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Active NGOs</div>
+        <div class="kpi-value" id="kpiAdminNgos">0</div>
+      </div>
+    </div>
+
+    <!-- Overview view: recent activity snapshot -->
+    <div class="admin-view" id="view-overview">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Recent activity</h3>
+          <a href="#" data-view="reports" class="view-link" style="font-size:0.85rem;font-weight:600;color:var(--orange-700);">View all reports →</a>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>ID</th><th>Reporter</th><th>Location</th><th>Date</th><th>Status</th></tr>
+            </thead>
+            <tbody id="adminOverviewBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- All reports view: full table -->
+    <div class="admin-view" id="view-reports" style="display:none;">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>All reports</h3>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th><th>Reporter</th><th>Location</th><th>NGO</th><th>Date</th><th>Status</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="adminReportsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- NGOs view -->
+    <div class="admin-view" id="view-ngos" style="display:none;">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Partner NGOs</h3>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>NGO</th><th>Assigned cases</th><th>Resolved</th><th>Status</th></tr>
+            </thead>
+            <tbody id="adminNgosBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Users view -->
+    <div class="admin-view" id="view-users" style="display:none;">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Citizens who filed reports</h3>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Name</th><th>Phone</th><th>Reports filed</th></tr>
+            </thead>
+            <tbody id="adminUsersBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

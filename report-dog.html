@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report a Dog — Paw Aid</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="navbar">
+  <div class="container">
+    <a href="index.html" class="brand"><span class="paw">🐕</span> Paw Aid</a>
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="report-dog.html" class="active">Report a Dog</a></li>
+      <li><a href="track-reports.html">Track a Report</a></li>
+    </ul>
+    <div class="nav-actions">
+      <a href="login.html" class="btn btn-ghost">Log In</a>
+      <a href="register.html" class="btn btn-primary">Register</a>
+    </div>
+    <button class="nav-toggle" aria-label="Menu">☰</button>
+  </div>
+</header>
+
+<main class="form-shell">
+  <div class="text-center" style="margin-bottom:34px;">
+    <span class="tag">Report a dog</span>
+    <h1>Tell us what you saw</h1>
+    <p>The more detail you give, the faster the right NGO can respond.</p>
+  </div>
+
+  <div class="form-panel">
+    <div id="reportSuccess" class="alert alert-success"></div>
+
+    <form id="reportForm">
+      <div class="field">
+        <label for="dogDesc">Describe the dog</label>
+        <input type="text" id="dogDesc" placeholder="e.g. Brown mixed-breed, limping on front leg" required>
+      </div>
+
+      <div class="field">
+        <label>How urgent is the situation?</label>
+        <div class="severity-options">
+          <div class="severity-chip" data-value="Injured">Injured</div>
+          <div class="severity-chip" data-value="Sick">Sick</div>
+          <div class="severity-chip" data-value="Malnourished">Malnourished</div>
+          <div class="severity-chip" data-value="Aggressive">Aggressive</div>
+          <div class="severity-chip" data-value="Other">Other</div>
+        </div>
+        <input type="hidden" id="severityValue">
+      </div>
+
+      <div class="field">
+        <label for="location">Location</label>
+        <input type="text" id="location" placeholder="e.g. Sector 21, Green Park" required>
+        <p class="hint">Be as specific as possible — landmark, street name, or area.</p>
+      </div>
+
+      <div class="field">
+        <label for="description">Additional details</label>
+        <textarea id="description" placeholder="What is the dog doing? How long has it been there? Any visible injuries?"></textarea>
+      </div>
+
+      <div class="field">
+        <label>Upload a photo (optional)</label>
+        <div class="upload-box">
+          <div class="icon">📷</div>
+          <div class="upload-text">Click to upload a photo</div>
+          <small>PNG or JPG, up to 5MB</small>
+        </div>
+        <input type="file" id="photoInput" accept="image/*" style="display:none;">
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="reporterName">Your name</label>
+          <input type="text" id="reporterName" placeholder="Full name" required>
+        </div>
+        <div class="field">
+          <label for="reporterPhone">Your phone number</label>
+          <input type="tel" id="reporterPhone" placeholder="For NGO follow-up" required>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block">Submit Report</button>
+    </form>
+  </div>
+</main>
+
+<footer>
+  <div class="container footer-bottom" style="border-top:none;padding-top:0;">
+    <span>© 2026 Paw Aid. All rights reserved.</span>
+    <a href="track-reports.html" style="color:var(--orange-500);font-weight:600;">Already reported? Track it →</a>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

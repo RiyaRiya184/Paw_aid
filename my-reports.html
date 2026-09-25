@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Reports — Paw Aid</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="navbar">
+  <div class="container">
+    <a href="index.html" class="brand"><span class="paw">🐕</span> Paw Aid</a>
+    <ul class="nav-links">
+      <li><a href="citizen-dashboard.html">Dashboard</a></li>
+      <li><a href="my-reports.html" class="active">My Reports</a></li>
+      <li><a href="report-dog.html">Report a Dog</a></li>
+    </ul>
+    <div class="nav-actions">
+      <a href="index.html" class="btn btn-ghost">Log Out</a>
+    </div>
+    <button class="nav-toggle" aria-label="Menu">☰</button>
+  </div>
+</header>
+
+<div class="dash-shell">
+  <aside class="sidebar">
+    <div class="user-chip">
+      <div class="avatar">Y</div>
+      <div>
+        <div class="name">You</div>
+        <div class="role">Citizen</div>
+      </div>
+    </div>
+    <ul class="side-nav">
+      <li><a href="citizen-dashboard.html">🏠 Overview</a></li>
+      <li><a href="my-reports.html" class="active">📋 My Reports</a></li>
+      <li><a href="report-dog.html">➕ Report a Dog</a></li>
+      <li><a href="track-reports.html">📍 Track a Report</a></li>
+      <li><a href="index.html">🚪 Log Out</a></li>
+    </ul>
+  </aside>
+
+  <main class="dash-main">
+    <div class="dash-head">
+      <div>
+        <h1 style="font-size:1.8rem;">My Reports</h1>
+        <p>Every dog sighting you've reported, in one place.</p>
+      </div>
+      <a href="report-dog.html" class="btn btn-primary">+ New Report</a>
+    </div>
+
+    <div class="panel">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Description</th>
+              <th>Location</th>
+              <th>Date</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="myReportsBody"></tbody>
+        </table>
+      </div>
+      <div id="emptyState" class="empty-state" style="display:none;">
+        <div class="icon">🐾</div>
+        <h3>No reports yet</h3>
+        <p>Spotted a dog that needs help? File your first report.</p>
+        <a href="report-dog.html" class="btn btn-primary">Report a Dog</a>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

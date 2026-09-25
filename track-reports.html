@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Track a Report — Paw Aid</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="navbar">
+  <div class="container">
+    <a href="index.html" class="brand"><span class="paw">🐕</span> Paw Aid</a>
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="report-dog.html">Report a Dog</a></li>
+      <li><a href="track-reports.html" class="active">Track a Report</a></li>
+    </ul>
+    <div class="nav-actions">
+      <a href="login.html" class="btn btn-ghost">Log In</a>
+      <a href="register.html" class="btn btn-primary">Register</a>
+    </div>
+    <button class="nav-toggle" aria-label="Menu">☰</button>
+  </div>
+</header>
+
+<main class="form-shell">
+  <div class="text-center" style="margin-bottom:34px;">
+    <span class="tag">Track a report</span>
+    <h1>Where does your report stand?</h1>
+    <p>Enter the tracking ID you received when you filed the report — no login needed.</p>
+  </div>
+
+  <div class="form-panel" style="margin-bottom:26px;">
+    <form id="trackForm" class="flex gap-12" style="align-items:flex-end;flex-wrap:wrap;">
+      <div class="field" style="flex:1;min-width:220px;margin-bottom:0;">
+        <label for="trackId">Tracking ID</label>
+        <input type="text" id="trackId" placeholder="e.g. PA-1044" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Track</button>
+    </form>
+  </div>
+
+  <div id="trackResult" style="display:none;"></div>
+</main>
+
+<footer>
+  <div class="container footer-bottom" style="border-top:none;padding-top:0;">
+    <span>© 2026 Paw Aid. All rights reserved.</span>
+    <a href="report-dog.html" style="color:var(--orange-500);font-weight:600;">Report a new sighting →</a>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

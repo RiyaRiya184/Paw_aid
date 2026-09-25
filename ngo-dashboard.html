@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NGO Dashboard — Paw Aid</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="navbar">
+  <div class="container">
+    <a href="index.html" class="brand"><span class="paw">🐕</span> Paw Aid</a>
+    <ul class="nav-links">
+      <li><a href="ngo-dashboard.html" class="active">Dashboard</a></li>
+    </ul>
+    <div class="nav-actions">
+      <a href="index.html" class="btn btn-ghost">Log Out</a>
+    </div>
+    <button class="nav-toggle" aria-label="Menu">☰</button>
+  </div>
+</header>
+
+<div class="dash-shell">
+  <aside class="sidebar">
+    <div class="user-chip">
+      <div class="avatar">C</div>
+      <div>
+        <div class="name">Compassion Paws</div>
+        <div class="role">NGO Partner</div>
+      </div>
+    </div>
+    <ul class="side-nav">
+      <li><a href="#" data-ngo-view="reports" data-filter="all" class="active">📋 All Reports</a></li>
+      <li><a href="#" data-ngo-view="reports" data-filter="In Progress">🚑 Active Rescues</a></li>
+      <li><a href="#" data-ngo-view="reports" data-filter="Resolved">✅ Resolved Cases</a></li>
+      <li><a href="#" data-ngo-view="team">👥 Team</a></li>
+      <li><a href="index.html">🚪 Log Out</a></li>
+    </ul>
+  </aside>
+
+  <main class="dash-main">
+    <div class="dash-head">
+      <div>
+        <h1 style="font-size:1.8rem;" id="ngoViewTitle">NGO Dashboard</h1>
+        <p id="ngoViewSubtitle">Review incoming reports and manage rescue status.</p>
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Total reports</div>
+        <div class="kpi-value" id="kpiNgoTotal">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Pending</div>
+        <div class="kpi-value" id="kpiNgoPending">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">In progress</div>
+        <div class="kpi-value" id="kpiNgoProgress">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Resolved</div>
+        <div class="kpi-value" id="kpiNgoResolved">0</div>
+      </div>
+    </div>
+
+    <div class="ngo-view" id="ngo-view-reports">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Incoming reports</h3>
+          <select id="ngoFilter">
+            <option value="all">All statuses</option>
+            <option value="Pending">Pending</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Resolved">Resolved</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th><th>Description</th><th>Location</th><th>Severity</th><th>Date</th><th>Status</th><th>Update</th>
+              </tr>
+            </thead>
+            <tbody id="ngoReportsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="ngo-view" id="ngo-view-team" style="display:none;">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Team members</h3>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Name</th><th>Role</th><th>Cases handled</th><th>Contact</th></tr>
+            </thead>
+            <tbody id="ngoTeamBody">
+              <tr><td>Rina Verma</td><td>Rescue Coordinator</td><td>32</td><td>rina@compassionpaws.org</td></tr>
+              <tr><td>Sanjay Mehta</td><td>Field Rescuer</td><td>48</td><td>sanjay@compassionpaws.org</td></tr>
+              <tr><td>Priya Nair</td><td>Veterinary Lead</td><td>27</td><td>priya@compassionpaws.org</td></tr>
+              <tr><td>Farhan Ali</td><td>Field Rescuer</td><td>19</td><td>farhan@compassionpaws.org</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
