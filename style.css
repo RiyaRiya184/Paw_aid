@@ -725,3 +725,33 @@ footer .brand{ color: var(--paper); }
   .dash-main{ padding: 26px 18px; }
   .footer-grid{ grid-template-columns: 1fr; }
 }
+/* ==========================================================================
+   Added for the database version — these only appear when needed
+   (report details popup, and a setup notice if config.js is not filled in)
+   ========================================================================== */
+
+.modal{
+  position: fixed; inset: 0; z-index: 1000;
+  display: none; align-items: center; justify-content: center;
+  padding: 16px; background: rgba(43, 27, 16, 0.55);
+}
+.modal.open{ display: flex; }
+.modal-card{
+  position: relative; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto;
+  background: var(--paper); border-radius: var(--radius-md); padding: 26px;
+  box-shadow: var(--shadow-soft);
+}
+.modal-close{
+  position: absolute; top: 10px; right: 14px;
+  background: none; border: none; font-size: 1.6rem; line-height: 1;
+  color: var(--brown-500); cursor: pointer;
+}
+.modal-card .panel-head{ padding-right: 28px; }
+.report-photo{
+  display: block; width: 100%; max-height: 320px; object-fit: cover;
+  border-radius: var(--radius-sm); margin-bottom: 16px;
+}
+.config-banner{
+  background: var(--red-100); color: var(--red-600);
+  padding: 10px 16px; font-size: 0.88rem; text-align: center;
+}

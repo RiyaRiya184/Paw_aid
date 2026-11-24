@@ -1,90 +1,189 @@
 /* ==========================================================================
-   Paw Aid — shared front-end logic
-   All data is stored in localStorage so every page works together
-   without a backend. Replace the STORAGE section with real API calls
-   when you connect a server.
+   Paw Aid — front-end logic
+   Data, logins and photos are stored in Supabase (see supabase/schema.sql).
+   Every page loads: supabase-js (CDN) → config.js → this file.
+   The pages' look and layout are unchanged; this file only makes the
+   existing forms, tables and buttons work against the real database.
    ========================================================================== */
 
-const STORAGE_KEY = 'pawaid_reports';
-const USER_KEY = 'pawaid_session';
+const PHOTO_BUCKET = 'report-photos';
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+const DASHBOARDS = { citizen: 'citizen-dashboard.html', ngo: 'ngo-dashboard.html', admin: 'admin-dashboard.html' };
 
-/* ---------------------------- Seed demo data ---------------------------- */
+/* ------------------------------ Supabase client ------------------------------ */
 
-function seedReports(){
-  if (localStorage.getItem(STORAGE_KEY)) return;
-  const sample = [
-    {
-      id: 'PA-1042',
-      dog: 'Brown mixed-breed, limping on front leg',
-      location: 'Sector 21, Green Park',
-      severity: 'Injured',
-      description: 'Dog seen near the bus stop, appears to have a hurt paw and is not moving much.',
-      reporter: 'Aisha Khan',
-      phone: '9876543210',
-      date: '2026-09-08',
-      status: 'Resolved',
-      ngo: 'Compassion Paws NGO',
-      photo: ''
-    },
-    {
-      id: 'PA-1043',
-      dog: 'White & tan puppy, very thin',
-      location: 'Model Town Market',
-      severity: 'Malnourished',
-      description: 'Small puppy looks underfed, has been near the vegetable stalls for two days.',
-      reporter: 'Rohit Sharma',
-      phone: '9812345678',
-      date: '2026-09-10',
-      status: 'In Progress',
-      ngo: 'Street Paws Trust',
-      photo: ''
-    },
-    {
-      id: 'PA-1044',
-      dog: 'Black dog with wound on ear',
-      location: 'Lajpat Nagar Central Market',
-      severity: 'Injured',
-      description: 'Visible wound on the left ear, dog is aggressive when approached.',
-      reporter: 'Meera Iyer',
-      phone: '9900112233',
-      date: '2026-09-11',
-      status: 'Pending',
-      ngo: '',
-      photo: ''
-    },
-    {
-      id: 'PA-1045',
-      dog: 'Grey stray, skin infection',
-      location: 'Rohini Sector 9',
-      severity: 'Sick',
-      description: 'Visible patches of hair loss and scratching constantly.',
-      reporter: 'You',
-      phone: '9000000000',
-      date: '2026-09-12',
-      status: 'Pending',
-      ngo: '',
-      photo: ''
-    }
-  ];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sample));
+const CONFIG = window.PAWAID_CONFIG || {};
+const CONFIGURED = !!(window.supabase && CONFIG.SUPABASE_URL && !CONFIG.SUPABASE_URL.includes('YOUR-PROJECT')
+  && CONFIG.SUPABASE_ANON_KEY && !CONFIG.SUPABASE_ANON_KEY.includes('YOUR-'));
+const sb = CONFIGURED ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
+
+/* --------------------------------- Helpers ---------------------------------- */
+
+function $(id){ return document.getElementById(id); }
+
+function esc(value){
+  return String(value ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
 }
 
-function getReports(){
-  seedReports();
-  return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+function formatDate(d){
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function saveReports(reports){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+function formatDateTime(d){
+  if (!d) return '';
+  return new Date(d).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-function nextReportId(reports){
-  const nums = reports.map(r => parseInt(r.id.replace('PA-', ''), 10)).filter(n => !isNaN(n));
-  const max = nums.length ? Math.max(...nums) : 1040;
-  return 'PA-' + (max + 1);
+function statusBadge(status){
+  const map = { 'Pending': 'badge-pending', 'In Progress': 'badge-progress', 'Resolved': 'badge-resolved', 'Rejected': 'badge-rejected' };
+  return `<span class="badge ${map[status] || 'badge-pending'}">${esc(status)}</span>`;
 }
 
-/* ------------------------------ Nav toggle ------------------------------ */
+function photoUrl(path){
+  if (!path || !sb) return '';
+  return sb.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+// Uses the pages' existing .alert boxes (hidden until .show is added).
+function showAlert(el, message, type = 'error'){
+  if (!el) return;
+  el.classList.remove('alert-error', 'alert-success');
+  el.classList.add('alert', type === 'success' ? 'alert-success' : 'alert-error', 'show');
+  el.innerHTML = message;
+}
+
+function hideAlert(el){ if (el) el.classList.remove('show'); }
+
+// Login and reset pages have no alert box in the design; add a hidden one.
+function ensureAlert(form){
+  let box = form.parentElement.querySelector('.alert');
+  if (!box){
+    box = document.createElement('div');
+    box.className = 'alert';
+    form.parentElement.insertBefore(box, form);
+  }
+  return box;
+}
+
+function friendlyError(err){
+  const msg = (err && (err.message || err.error_description)) || String(err || 'Something went wrong');
+  if (/Invalid login credentials/i.test(msg)) return 'Wrong email or password.';
+  if (/Email not confirmed/i.test(msg)) return 'Please confirm your email first — check your inbox for the link.';
+  if (/User already registered/i.test(msg)) return 'An account with this email already exists. Try logging in.';
+  if (/Failed to fetch/i.test(msg)) return 'Could not reach the server. Check your internet connection.';
+  return msg;
+}
+
+function setBusy(button, busy, busyText){
+  if (!button) return;
+  if (busy){
+    button.dataset.label = button.textContent;
+    button.textContent = busyText || 'Please wait…';
+    button.disabled = true;
+  } else {
+    button.textContent = button.dataset.label || button.textContent;
+    button.disabled = false;
+  }
+}
+
+function emptyRow(cols, html){
+  return `<tr><td colspan="${cols}" style="text-align:center;color:var(--brown-500);padding:30px;">${html}</td></tr>`;
+}
+
+function reportLink(r){
+  return `<a href="#" data-open-report="${r.id}">${esc(r.code)}</a>`;
+}
+
+function showConfigBanner(){
+  const bar = document.createElement('div');
+  bar.className = 'config-banner';
+  bar.innerHTML = 'Paw Aid is not connected to its database yet. Add your Supabase URL and key to <code>config.js</code> (see README).';
+  document.body.prepend(bar);
+}
+
+/* ------------------------------- Session / auth ------------------------------- */
+
+let profileCache = null;
+
+async function currentUser(){
+  if (!sb) return null;
+  const { data } = await sb.auth.getSession();
+  return data.session ? data.session.user : null;
+}
+
+async function currentProfile(){
+  if (profileCache) return profileCache;
+  const user = await currentUser();
+  if (!user) return null;
+  const { data, error } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
+  if (error) throw error;
+  profileCache = data;
+  return data;
+}
+
+// Dashboards call this. Visitors go to login; users go to their own dashboard.
+async function requireRole(role){
+  const profile = await currentProfile();
+  if (!profile){
+    window.location.replace('login.html');
+    return null;
+  }
+  if (profile.role !== role){
+    window.location.replace(DASHBOARDS[profile.role] || 'index.html');
+    return null;
+  }
+  return profile;
+}
+
+function fillUserChip(name, roleLabel){
+  document.querySelectorAll('.user-chip').forEach(chip => {
+    const n = chip.querySelector('.name');
+    const a = chip.querySelector('.avatar');
+    const r = chip.querySelector('.role');
+    if (n && name) n.textContent = name;
+    if (a && name) a.textContent = name.trim().charAt(0).toUpperCase();
+    if (r && roleLabel) r.textContent = roleLabel;
+  });
+}
+
+function isLogoutLink(a){
+  return a && a.textContent.replace(/[^A-Za-z ]/g, '').trim().toLowerCase() === 'log out';
+}
+
+// Every "Log Out" link in the design really signs out now.
+function initLogoutLinks(){
+  document.addEventListener('click', async (e) => {
+    const a = e.target.closest('a');
+    if (!isLogoutLink(a)) return;
+    e.preventDefault();
+    if (sb) await sb.auth.signOut();
+    profileCache = null;
+    window.location.href = 'index.html';
+  });
+}
+
+// On public pages, once signed in, "Log In / Register" become "My Dashboard / Log Out"
+// (same buttons, same styles).
+async function initNavSession(){
+  const actions = document.querySelector('.nav-actions');
+  if (!actions || !actions.querySelector('a[href="login.html"], a[href="register.html"]')) return;
+  const profile = await currentProfile().catch(() => null);
+  if (!profile) return;
+  const buttons = actions.querySelectorAll('a');
+  const first = buttons[0];
+  const last = buttons[buttons.length - 1];
+  first.textContent = 'My Dashboard';
+  first.href = DASHBOARDS[profile.role];
+  if (last !== first){
+    last.textContent = 'Log Out';
+    last.href = 'index.html';
+  }
+}
+
+/* ------------------------------ Shared UI bits ------------------------------ */
 
 function initNav(){
   const toggle = document.querySelector('.nav-toggle');
@@ -92,8 +191,6 @@ function initNav(){
   if (!toggle || !links) return;
   toggle.addEventListener('click', () => links.classList.toggle('open'));
 }
-
-/* --------------------------- Role toggle (auth) -------------------------- */
 
 function initRoleToggle(){
   const wrap = document.querySelector('.role-toggle');
@@ -108,382 +205,618 @@ function initRoleToggle(){
   });
 }
 
-/* --------------------------- Severity chips ------------------------------ */
-
 function initSeverityChips(){
   const chips = document.querySelectorAll('.severity-chip');
-  if (!chips.length) return;
   chips.forEach(chip => {
     chip.addEventListener('click', () => {
       chips.forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
-      const input = document.getElementById('severityValue');
-      if (input) input.value = chip.dataset.value;
+      $('severityValue').value = chip.dataset.value;
     });
   });
 }
 
-/* ------------------------------ File upload ------------------------------ */
-
 function initFileUpload(){
   const box = document.querySelector('.upload-box');
-  const input = document.getElementById('photoInput');
+  const input = $('photoInput');
   if (!box || !input) return;
   box.addEventListener('click', () => input.click());
   input.addEventListener('change', () => {
     const label = box.querySelector('.upload-text');
-    if (input.files && input.files[0] && label){
-      label.textContent = input.files[0].name;
+    const file = input.files && input.files[0];
+    if (!label) return;
+    if (!file){ label.textContent = 'Click to upload a photo'; return; }
+    if (file.size > MAX_PHOTO_BYTES){
+      label.textContent = 'That photo is over 5MB — please choose a smaller one';
+      input.value = '';
+      return;
     }
+    label.textContent = file.name;
   });
 }
 
-/* ------------------------------ Auth forms -------------------------------- */
+/* ------------------------------- Report popup -------------------------------
+   Opens when an NGO or admin clicks a report ID, so they can see the photo,
+   full details and the reporter's phone number. */
 
-function initLoginForm(){
-  const form = document.getElementById('loginForm');
-  if (!form) return;
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const roleWrap = document.querySelector('.role-toggle');
-    const role = roleWrap ? roleWrap.dataset.role : 'citizen';
-    const email = document.getElementById('email').value;
-    localStorage.setItem(USER_KEY, JSON.stringify({ email, role }));
-    const destinations = {
-      citizen: 'citizen-dashboard.html',
-      ngo: 'ngo-dashboard.html',
-      admin: 'admin-dashboard.html'
-    };
-    window.location.href = destinations[role] || 'citizen-dashboard.html';
-  });
-}
+async function openReportModal(reportId){
+  let modal = $('reportModal');
+  if (!modal){
+    modal = document.createElement('div');
+    modal.id = 'reportModal';
+    modal.className = 'modal';
+    modal.innerHTML = '<div class="modal-card"><button class="modal-close" aria-label="Close">×</button><div class="modal-body"></div></div>';
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal || e.target.closest('.modal-close')) modal.classList.remove('open');
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') modal.classList.remove('open'); });
+  }
+  const body = modal.querySelector('.modal-body');
+  body.innerHTML = '<p>Loading…</p>';
+  modal.classList.add('open');
 
-function initRegisterForm(){
-  const form = document.getElementById('registerForm');
-  if (!form) return;
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const success = document.getElementById('formSuccess');
-    if (success) success.classList.add('show');
-    form.reset();
-    setTimeout(() => { window.location.href = 'login.html'; }, 1200);
-  });
-}
-
-/* ---------------------------- Report a dog form --------------------------- */
-
-function initReportForm(){
-  const form = document.getElementById('reportForm');
-  if (!form) return;
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const reports = getReports();
-    const id = nextReportId(reports);
-    const newReport = {
-      id,
-      dog: document.getElementById('dogDesc').value,
-      location: document.getElementById('location').value,
-      severity: document.getElementById('severityValue').value || 'Unknown',
-      description: document.getElementById('description').value,
-      reporter: document.getElementById('reporterName').value || 'You',
-      phone: document.getElementById('reporterPhone').value,
-      date: new Date().toISOString().slice(0, 10),
-      status: 'Pending',
-      ngo: '',
-      photo: ''
-    };
-    reports.unshift(newReport);
-    saveReports(reports);
-
-    const successBox = document.getElementById('reportSuccess');
-    if (successBox){
-      successBox.classList.add('show');
-      successBox.innerHTML = `Report submitted! Your tracking ID is <strong>${id}</strong>. Save it to track progress.`;
-    }
-    form.reset();
-    document.querySelectorAll('.severity-chip').forEach(c => c.classList.remove('active'));
-  });
-}
-
-/* ------------------------------ My reports -------------------------------- */
-
-function renderMyReports(){
-  const tbody = document.getElementById('myReportsBody');
-  if (!tbody) return;
-  const reports = getReports();
-  const mine = reports.filter(r => r.reporter === 'You');
-  const emptyState = document.getElementById('emptyState');
-
-  if (!mine.length){
-    if (emptyState) emptyState.style.display = 'block';
+  const [{ data: r, error }, { data: updates }] = await Promise.all([
+    sb.from('reports').select('*, ngos(name)').eq('id', reportId).maybeSingle(),
+    sb.from('report_updates').select('*').eq('report_id', reportId).order('created_at')
+  ]);
+  if (error || !r){
+    body.innerHTML = `<p>${esc(error ? friendlyError(error) : 'Report not found.')}</p>`;
     return;
   }
-  if (emptyState) emptyState.style.display = 'none';
-
-  tbody.innerHTML = mine.map(r => `
-    <tr>
-      <td>${r.id}</td>
-      <td>${r.dog}</td>
-      <td>${r.location}</td>
-      <td>${formatDate(r.date)}</td>
-      <td>${statusBadge(r.status)}</td>
-      <td><a class="btn btn-outline btn-sm" href="track-reports.html?id=${r.id}">Track</a></td>
-    </tr>
-  `).join('');
+  body.innerHTML = `
+    <div class="panel-head">
+      <div>
+        <h3>${esc(r.code)}</h3>
+        <p style="margin:0;color:var(--brown-500);font-size:0.9rem;">${esc(r.dog_description)}</p>
+      </div>
+      ${statusBadge(r.status)}
+    </div>
+    ${r.photo_path ? `<img class="report-photo" src="${esc(photoUrl(r.photo_path))}" alt="Photo of the reported dog">` : ''}
+    <p><strong>Severity:</strong> ${esc(r.severity)}</p>
+    <p><strong>Location:</strong> ${esc(r.location)}</p>
+    ${r.description ? `<p><strong>Details:</strong> ${esc(r.description)}</p>` : ''}
+    <p><strong>Reporter:</strong> ${esc(r.reporter_name)} · <a href="tel:${esc(r.reporter_phone)}" style="color:var(--orange-700);font-weight:600;">${esc(r.reporter_phone)}</a></p>
+    <p><strong>Reported on:</strong> ${formatDateTime(r.created_at)}</p>
+    <p><strong>Assigned NGO:</strong> ${esc(r.ngos ? r.ngos.name : 'Not assigned yet')}</p>
+    <ul class="timeline" style="margin-top:18px;">
+      ${(updates || []).map(u => `
+        <li class="done">
+          <div class="t-title">${esc(u.note || u.status)}</div>
+          <div class="t-time">${formatDateTime(u.created_at)}${u.actor_label ? ' · ' + esc(u.actor_label) : ''}</div>
+        </li>`).join('')}
+    </ul>`;
 }
 
-/* ----------------------------- Track reports ------------------------------ */
+/* ----------------------------------- Login ----------------------------------- */
 
-function statusBadge(status){
-  const map = {
-    'Pending': 'badge-pending',
-    'In Progress': 'badge-progress',
-    'Resolved': 'badge-resolved',
-    'Rejected': 'badge-rejected'
-  };
-  return `<span class="badge ${map[status] || 'badge-pending'}">${status}</span>`;
+function initLoginForm(){
+  const form = $('loginForm');
+  if (!form) return;
+  const alertBox = ensureAlert(form);
+
+  // Already signed in? Go straight to the dashboard.
+  currentProfile().then(p => { if (p) window.location.replace(DASHBOARDS[p.role]); }).catch(() => {});
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideAlert(alertBox);
+    const btn = form.querySelector('button[type="submit"]');
+    setBusy(btn, true, 'Logging in…');
+    const { error } = await sb.auth.signInWithPassword({
+      email: $('email').value.trim(),
+      password: $('password').value
+    });
+    if (error){
+      setBusy(btn, false);
+      showAlert(alertBox, esc(friendlyError(error)));
+      return;
+    }
+    profileCache = null;
+    const profile = await currentProfile();
+    // The account's real role decides the dashboard, whichever tab was picked.
+    window.location.href = DASHBOARDS[profile && profile.role] || 'citizen-dashboard.html';
+  });
+
+  const forgot = Array.from(form.querySelectorAll('a')).find(a => /forgot password/i.test(a.textContent));
+  if (forgot){
+    forgot.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const email = $('email').value.trim();
+      if (!email){
+        showAlert(alertBox, 'Type your email address above, then click “Forgot password?” again.');
+        return;
+      }
+      const redirectTo = new URL('reset-password.html', location.href).href;
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+      if (error) showAlert(alertBox, esc(friendlyError(error)));
+      else showAlert(alertBox, 'If an account exists for that email, a password reset link is on its way.', 'success');
+    });
+  }
 }
 
-function formatDate(d){
-  const date = new Date(d);
-  return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+/* --------------------------------- Register --------------------------------- */
+
+function initRegisterForm(){
+  const form = $('registerForm');
+  if (!form) return;
+  const alertBox = $('formSuccess');
+  const roleWrap = document.querySelector('.role-toggle');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideAlert(alertBox);
+    const password = $('regPassword').value;
+    if (password.length < 8){
+      showAlert(alertBox, 'Password must be at least 8 characters.');
+      return;
+    }
+    const role = roleWrap && roleWrap.dataset.role === 'ngo' ? 'ngo' : 'citizen';
+    const name = $('fullName').value.trim();
+    const btn = form.querySelector('button[type="submit"]');
+    setBusy(btn, true, 'Creating account…');
+
+    const { data, error } = await sb.auth.signUp({
+      email: $('regEmail').value.trim(),
+      password,
+      options: {
+        emailRedirectTo: new URL('login.html', location.href).href,
+        // For NGOs the "Full name / Organization name" field is the NGO's name.
+        data: { role, full_name: name, phone: $('regPhone').value.trim(), org_name: role === 'ngo' ? name : '' }
+      }
+    });
+    setBusy(btn, false);
+    if (error){
+      showAlert(alertBox, esc(friendlyError(error)));
+      return;
+    }
+    form.reset();
+    const ngoNote = role === 'ngo' ? ' Your NGO can take cases once an admin approves it.' : '';
+    if (data.session){
+      showAlert(alertBox, 'Account created! Taking you to your dashboard…' + ngoNote, 'success');
+      setTimeout(() => { window.location.href = DASHBOARDS[role]; }, 1500);
+    } else {
+      showAlert(alertBox, 'Account created! We sent a confirmation link to your email — click it, then log in.' + ngoNote, 'success');
+    }
+  });
 }
+
+/* ------------------------------ Reset password ------------------------------ */
+
+function initResetPasswordForm(){
+  const form = $('resetForm');
+  if (!form) return;
+  const alertBox = ensureAlert(form);
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const pw = $('newPassword').value;
+    if (pw.length < 8){ showAlert(alertBox, 'Password must be at least 8 characters.'); return; }
+    if (pw !== $('confirmPassword').value){ showAlert(alertBox, 'The two passwords do not match.'); return; }
+    if (!(await currentUser())){
+      showAlert(alertBox, 'This reset link has expired. Go to <a href="login.html">Log In</a> and request a new one.');
+      return;
+    }
+    const { error } = await sb.auth.updateUser({ password: pw });
+    if (error){ showAlert(alertBox, esc(friendlyError(error))); return; }
+    showAlert(alertBox, 'Password updated! Taking you to your dashboard…', 'success');
+    const profile = await currentProfile();
+    setTimeout(() => { window.location.href = DASHBOARDS[profile && profile.role] || 'index.html'; }, 1200);
+  });
+}
+
+/* ------------------------------- Report a dog ------------------------------- */
+
+function initReportForm(){
+  const form = $('reportForm');
+  if (!form) return;
+  const alertBox = $('reportSuccess');
+
+  // Pre-fill name/phone for signed-in users.
+  currentProfile().then(p => {
+    if (!p) return;
+    if (!$('reporterName').value) $('reporterName').value = p.full_name || '';
+    if (!$('reporterPhone').value) $('reporterPhone').value = p.phone || '';
+  }).catch(() => {});
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideAlert(alertBox);
+    const btn = form.querySelector('button[type="submit"]');
+    setBusy(btn, true, 'Submitting…');
+
+    try {
+      let photoPath = null;
+      const file = $('photoInput').files[0];
+      if (file){
+        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace('jpeg', 'jpg');
+        if (!['jpg', 'png', 'webp', 'gif'].includes(ext)) throw new Error('Photo must be a JPG, PNG, WEBP or GIF image.');
+        if (file.size > MAX_PHOTO_BYTES) throw new Error('Photo must be 5MB or smaller.');
+        photoPath = `reports/${crypto.randomUUID().replace(/-/g, '')}.${ext}`;
+        const { error: upErr } = await sb.storage.from(PHOTO_BUCKET).upload(photoPath, file, { contentType: file.type, upsert: false });
+        if (upErr) throw upErr;
+      }
+
+      const { data: code, error } = await sb.rpc('submit_report', {
+        p_dog_description: $('dogDesc').value.trim(),
+        p_severity: $('severityValue').value || 'Other',
+        p_location: $('location').value.trim(),
+        p_description: $('description').value.trim(),
+        p_reporter_name: $('reporterName').value.trim(),
+        p_reporter_phone: $('reporterPhone').value.trim(),
+        p_photo_path: photoPath
+      });
+      if (error) throw error;
+
+      showAlert(alertBox, `Report submitted! Your tracking ID is <strong>${esc(code)}</strong>. Save it to track progress.`, 'success');
+      form.reset();
+      document.querySelectorAll('.severity-chip').forEach(c => c.classList.remove('active'));
+      $('severityValue').value = '';
+      const label = document.querySelector('.upload-box .upload-text');
+      if (label) label.textContent = 'Click to upload a photo';
+    } catch (err){
+      showAlert(alertBox, esc(friendlyError(err)));
+    } finally {
+      setBusy(btn, false);
+    }
+  });
+}
+
+/* ------------------------------ Track a report ------------------------------ */
 
 function initTrackSearch(){
-  const form = document.getElementById('trackForm');
-  const result = document.getElementById('trackResult');
+  const form = $('trackForm');
+  const result = $('trackResult');
   if (!form || !result) return;
 
-  function showResult(id){
-    const reports = getReports();
-    const report = reports.find(r => r.id.toLowerCase() === id.trim().toLowerCase());
-    if (!report){
+  async function showResult(code){
+    const { data: r, error } = await sb.rpc('track_report', { p_code: code });
+    if (error || !r){
       result.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><h3>No report found</h3><p>Double check the tracking ID and try again.</p></div>`;
       result.style.display = 'block';
       return;
     }
 
+    // Same five steps as the original design, now driven by real history.
+    const updates = r.updates || [];
+    const firstTime = (fn) => { const u = updates.find(fn); return u ? u.at : null; };
+    const accepted = firstTime(u => /accepted|assigned/i.test(u.note));
+    const progress = firstTime(u => u.status === 'In Progress');
+    const resolved = firstTime(u => u.status === 'Resolved');
     const steps = [
-      { label: 'Report submitted', done: true },
-      { label: 'Under review by team', done: report.status !== 'Pending' || true },
-      { label: 'Assigned to NGO', done: !!report.ngo },
-      { label: 'Rescue in progress', done: report.status === 'In Progress' || report.status === 'Resolved' },
-      { label: 'Case resolved', done: report.status === 'Resolved' }
+      { label: 'Report submitted', done: true, at: r.created_at },
+      { label: 'Under review by team', done: true },
+      { label: 'Assigned to NGO', done: !!r.ngo_name, at: accepted },
+      { label: 'Rescue in progress', done: r.status === 'In Progress' || r.status === 'Resolved', at: progress },
+      { label: r.status === 'Rejected' ? 'Case closed' : 'Case resolved', done: r.status === 'Resolved' || r.status === 'Rejected',
+        at: resolved || firstTime(u => u.status === 'Rejected') }
     ];
 
     result.innerHTML = `
       <div class="panel">
         <div class="panel-head">
           <div>
-            <h3>${report.id}</h3>
-            <p style="margin:0;color:var(--brown-500);font-size:0.9rem;">${report.dog}</p>
+            <h3>${esc(r.code)}</h3>
+            <p style="margin:0;color:var(--brown-500);font-size:0.9rem;">${esc(r.dog_description)}</p>
           </div>
-          ${statusBadge(report.status)}
+          ${statusBadge(r.status)}
         </div>
-        <p><strong>Location:</strong> ${report.location}</p>
-        <p><strong>Reported on:</strong> ${formatDate(report.date)}</p>
-        ${report.ngo ? `<p><strong>Assigned NGO:</strong> ${report.ngo}</p>` : ''}
+        <p><strong>Location:</strong> ${esc(r.location)}</p>
+        <p><strong>Reported on:</strong> ${formatDate(r.created_at)}</p>
+        ${r.ngo_name ? `<p><strong>Assigned NGO:</strong> ${esc(r.ngo_name)}</p>` : ''}
         <ul class="timeline">
-          ${steps.map(s => `<li class="${s.done ? 'done' : ''}"><div class="t-title">${s.label}</div></li>`).join('')}
+          ${steps.map(s => `<li class="${s.done ? 'done' : ''}"><div class="t-title">${s.label}</div>${s.done && s.at ? `<div class="t-time">${formatDateTime(s.at)}</div>` : ''}</li>`).join('')}
         </ul>
-      </div>
-    `;
+      </div>`;
     result.style.display = 'block';
   }
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    showResult(document.getElementById('trackId').value);
+    showResult($('trackId').value);
   });
 
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('id')){
-    document.getElementById('trackId').value = params.get('id');
-    showResult(params.get('id'));
+  const id = new URLSearchParams(location.search).get('id');
+  if (id){
+    $('trackId').value = id;
+    showResult(id);
   }
 }
 
-/* ------------------------------ Citizen dashboard -------------------------- */
+/* --------------------------- Citizen: dashboard + list --------------------------- */
 
-function renderCitizenDashboard(){
-  const el = document.getElementById('citizenStats');
-  if (!el) return;
-  const reports = getReports();
-  const mine = reports.filter(r => r.reporter === 'You');
-  const pending = mine.filter(r => r.status === 'Pending').length;
-  const progress = mine.filter(r => r.status === 'In Progress').length;
-  const resolved = mine.filter(r => r.status === 'Resolved').length;
-
-  document.getElementById('kpiTotal').textContent = mine.length;
-  document.getElementById('kpiPending').textContent = pending;
-  document.getElementById('kpiProgress').textContent = progress;
-  document.getElementById('kpiResolved').textContent = resolved;
-
-  const tbody = document.getElementById('recentReportsBody');
-  if (tbody){
-    const recent = mine.slice(0, 5);
-    tbody.innerHTML = recent.length ? recent.map(r => `
-      <tr>
-        <td>${r.id}</td>
-        <td>${r.dog}</td>
-        <td>${formatDate(r.date)}</td>
-        <td>${statusBadge(r.status)}</td>
-      </tr>
-    `).join('') : `<tr><td colspan="4" style="text-align:center;color:var(--brown-500);padding:30px;">No reports yet. <a href="report-dog.html" style="color:var(--orange-700);font-weight:600;">Report a dog</a></td></tr>`;
-  }
+async function loadMyReports(profile){
+  const { data, error } = await sb.from('reports')
+    .select('id, code, dog_description, location, status, created_at')
+    .eq('reporter_id', profile.id)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
 }
 
-/* -------------------------------- NGO dashboard ---------------------------- */
+async function initCitizenDashboard(){
+  if (!$('citizenStats')) return;
+  const profile = await requireRole('citizen');
+  if (!profile) return;
+  fillUserChip(profile.full_name, 'Citizen');
 
-function renderNgoDashboard(){
-  const tbody = document.getElementById('ngoReportsBody');
+  const mine = await loadMyReports(profile);
+  $('kpiTotal').textContent = mine.length;
+  $('kpiPending').textContent = mine.filter(r => r.status === 'Pending').length;
+  $('kpiProgress').textContent = mine.filter(r => r.status === 'In Progress').length;
+  $('kpiResolved').textContent = mine.filter(r => r.status === 'Resolved').length;
+
+  $('recentReportsBody').innerHTML = mine.length ? mine.slice(0, 5).map(r => `
+    <tr>
+      <td><a href="track-reports.html?id=${encodeURIComponent(r.code)}">${esc(r.code)}</a></td>
+      <td>${esc(r.dog_description)}</td>
+      <td>${formatDate(r.created_at)}</td>
+      <td>${statusBadge(r.status)}</td>
+    </tr>`).join('')
+    : emptyRow(4, 'No reports yet. <a href="report-dog.html" style="color:var(--orange-700);font-weight:600;">Report a dog</a>');
+}
+
+async function initMyReports(){
+  const tbody = $('myReportsBody');
   if (!tbody) return;
+  const profile = await requireRole('citizen');
+  if (!profile) return;
+  fillUserChip(profile.full_name, 'Citizen');
 
-  function render(filter = 'all'){
-    const reports = getReports();
-    const filtered = filter === 'all' ? reports : reports.filter(r => r.status === filter);
+  const mine = await loadMyReports(profile);
+  const emptyState = $('emptyState');
+  if (!mine.length){
+    if (emptyState) emptyState.style.display = 'block';
+    return;
+  }
+  if (emptyState) emptyState.style.display = 'none';
+  tbody.innerHTML = mine.map(r => `
+    <tr>
+      <td>${esc(r.code)}</td>
+      <td>${esc(r.dog_description)}</td>
+      <td>${esc(r.location)}</td>
+      <td>${formatDate(r.created_at)}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td><a class="btn btn-outline btn-sm" href="track-reports.html?id=${encodeURIComponent(r.code)}">Track</a></td>
+    </tr>`).join('');
+}
 
-    document.getElementById('kpiNgoTotal').textContent = reports.length;
-    document.getElementById('kpiNgoPending').textContent = reports.filter(r => r.status === 'Pending').length;
-    document.getElementById('kpiNgoProgress').textContent = reports.filter(r => r.status === 'In Progress').length;
-    document.getElementById('kpiNgoResolved').textContent = reports.filter(r => r.status === 'Resolved').length;
+/* ------------------------------- NGO dashboard -------------------------------
+   The table shows open cases (unassigned, Pending) plus this NGO's own cases.
+   The existing "Update" dropdown does everything:
+     open case  → pick "In Progress" (or Resolved/Rejected) to accept it
+     own case   → pick any status to update it; "Pending" hands it back */
 
-    tbody.innerHTML = filtered.length ? filtered.map(r => `
+async function initNgoDashboard(){
+  const tbody = $('ngoReportsBody');
+  if (!tbody) return;
+  const profile = await requireRole('ngo');
+  if (!profile) return;
+
+  const { data: ngo, error } = await sb.from('ngos').select('*').eq('owner_id', profile.id).maybeSingle();
+  if (error) throw error;
+  fillUserChip(ngo ? ngo.name : profile.full_name, 'NGO Partner');
+  initNgoNav(ngo ? ngo.name : 'your NGO');
+
+  if (!ngo || ngo.status !== 'approved'){
+    const msg = ngo && ngo.status === 'suspended'
+      ? 'Your NGO account has been suspended. Please contact the Paw Aid team.'
+      : 'Your NGO is waiting for admin approval. You can accept rescue cases once it is approved.';
+    $('ngoViewSubtitle').textContent = msg;
+    tbody.innerHTML = emptyRow(7, msg);
+    return;
+  }
+
+  let reports = [];
+
+  async function load(){
+    const { data, error } = await sb.from('reports')
+      .select('id, code, dog_description, location, severity, status, ngo_id, created_at')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    reports = data;
+    render();
+  }
+
+  function render(){
+    const filter = $('ngoFilter').value;
+    $('kpiNgoTotal').textContent = reports.length;
+    $('kpiNgoPending').textContent = reports.filter(r => r.status === 'Pending').length;
+    $('kpiNgoProgress').textContent = reports.filter(r => r.status === 'In Progress').length;
+    $('kpiNgoResolved').textContent = reports.filter(r => r.status === 'Resolved').length;
+
+    const list = filter === 'all' ? reports : reports.filter(r => r.status === filter);
+    tbody.innerHTML = list.length ? list.map(r => `
       <tr>
-        <td>${r.id}</td>
-        <td>${r.dog}</td>
-        <td>${r.location}</td>
-        <td>${r.severity}</td>
-        <td>${formatDate(r.date)}</td>
+        <td>${reportLink(r)}</td>
+        <td>${esc(r.dog_description)}</td>
+        <td>${esc(r.location)}</td>
+        <td>${esc(r.severity)}</td>
+        <td>${formatDate(r.created_at)}</td>
         <td>${statusBadge(r.status)}</td>
         <td>
           <select class="status-select" data-id="${r.id}" style="min-width:140px;padding:8px 10px;font-size:0.82rem;">
-            <option ${r.status==='Pending'?'selected':''}>Pending</option>
-            <option ${r.status==='In Progress'?'selected':''}>In Progress</option>
-            <option ${r.status==='Resolved'?'selected':''}>Resolved</option>
-            <option ${r.status==='Rejected'?'selected':''}>Rejected</option>
+            ${['Pending', 'In Progress', 'Resolved', 'Rejected'].map(s => `<option ${s === r.status ? 'selected' : ''}>${s}</option>`).join('')}
           </select>
         </td>
-      </tr>
-    `).join('') : `<tr><td colspan="7" style="text-align:center;color:var(--brown-500);padding:30px;">No reports match this filter.</td></tr>`;
+      </tr>`).join('') : emptyRow(7, 'No reports match this filter.');
+  }
 
-    tbody.querySelectorAll('.status-select').forEach(sel => {
-      sel.addEventListener('change', () => {
-        const reports = getReports();
-        const idx = reports.findIndex(r => r.id === sel.dataset.id);
-        if (idx > -1){
-          reports[idx].status = sel.value;
-          if (!reports[idx].ngo) reports[idx].ngo = 'Compassion Paws NGO';
-          saveReports(reports);
-          render(document.getElementById('ngoFilter').value);
+  tbody.addEventListener('change', async (e) => {
+    const sel = e.target.closest('.status-select');
+    if (!sel) return;
+    const r = reports.find(x => x.id === sel.dataset.id);
+    const status = sel.value;
+    sel.disabled = true;
+    let err = null;
+    if (!r.ngo_id){
+      if (status !== 'Pending'){
+        ({ error: err } = await sb.rpc('ngo_accept_report', { p_report: r.id }));
+        if (!err && status !== 'In Progress'){
+          ({ error: err } = await sb.rpc('update_report_status', { p_report: r.id, p_status: status, p_note: '' }));
         }
-      });
-    });
-  }
+      }
+    } else if (status === 'Pending'){
+      if (confirm('Hand this case back so another NGO can take it?')){
+        ({ error: err } = await sb.rpc('ngo_release_report', { p_report: r.id }));
+      }
+    } else {
+      ({ error: err } = await sb.rpc('update_report_status', { p_report: r.id, p_status: status, p_note: '' }));
+    }
+    if (err) alert(friendlyError(err));
+    await load();
+  });
 
-  const filterSelect = document.getElementById('ngoFilter');
-  if (filterSelect){
-    filterSelect.addEventListener('change', () => render(filterSelect.value));
-  }
-  render('all');
+  $('ngoFilter').addEventListener('change', render);
+  await load();
 }
 
-/* -------------------------------- Admin dashboard --------------------------- */
+function initNgoNav(ngoName){
+  const links = document.querySelectorAll('.side-nav a[data-ngo-view]');
+  if (!links.length) return;
 
-const PARTNER_NGOS = ['Compassion Paws NGO', 'Street Paws Trust', 'Second Chance Animal Rescue'];
+  const titles = {
+    'reports-all': ['NGO Dashboard', 'Review incoming reports and manage rescue status.'],
+    'reports-In Progress': ['Active Rescues', 'Cases your team is currently working on.'],
+    'reports-Resolved': ['Resolved Cases', 'Rescues your team has successfully completed.'],
+    'team': ['Our Team', `People handling rescues for ${ngoName}.`]
+  };
 
-function renderAdminDashboard(){
-  const tbody = document.getElementById('adminReportsBody');
+  function switchView(view, filter){
+    document.querySelectorAll('.ngo-view').forEach(v => v.style.display = 'none');
+    const target = $('ngo-view-' + view);
+    if (target) target.style.display = 'block';
+    links.forEach(l => l.classList.remove('active'));
+    const key = view === 'reports' ? 'reports-' + filter : view;
+    if (titles[key]){
+      $('ngoViewTitle').textContent = titles[key][0];
+      $('ngoViewSubtitle').textContent = titles[key][1];
+    }
+    if (view === 'reports'){
+      const select = $('ngoFilter');
+      select.value = filter;
+      select.dispatchEvent(new Event('change'));
+    }
+  }
+
+  links.forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchView(link.dataset.ngoView, link.dataset.filter);
+      link.classList.add('active');
+    });
+  });
+}
+
+/* ------------------------------ Admin dashboard ------------------------------
+   All reports: the NGO column is a dropdown to assign/unassign an NGO.
+   NGOs: lists every registered NGO with an Approve / Suspend button. */
+
+async function initAdminDashboard(){
+  const tbody = $('adminReportsBody');
   if (!tbody) return;
-  const reports = getReports();
+  const profile = await requireRole('admin');
+  if (!profile) return;
+  fillUserChip(profile.full_name || 'Admin', null);
+  initAdminNav();
 
-  document.getElementById('kpiAdminReports').textContent = reports.length;
-  document.getElementById('kpiAdminPending').textContent = reports.filter(r => r.status === 'Pending').length;
-  document.getElementById('kpiAdminResolved').textContent = reports.filter(r => r.status === 'Resolved').length;
-  const ngoSet = new Set(reports.map(r => r.ngo).filter(Boolean));
-  PARTNER_NGOS.forEach(n => ngoSet.add(n));
-  document.getElementById('kpiAdminNgos').textContent = ngoSet.size;
+  let reports = [], ngos = [], users = [];
 
-  // Overview: most recent 5 reports
-  const overviewBody = document.getElementById('adminOverviewBody');
-  if (overviewBody){
-    const recent = reports.slice(0, 5);
-    overviewBody.innerHTML = recent.length ? recent.map(r => `
+  async function load(){
+    const [rRes, nRes, uRes] = await Promise.all([
+      sb.from('reports').select('*').order('created_at', { ascending: false }),
+      sb.from('ngos').select('*').order('created_at', { ascending: false }),
+      sb.from('profiles').select('*').eq('role', 'citizen').order('created_at', { ascending: false })
+    ]);
+    for (const res of [rRes, nRes, uRes]) if (res.error) throw res.error;
+    reports = rRes.data; ngos = nRes.data; users = uRes.data;
+    render();
+  }
+
+  function render(){
+    const approved = ngos.filter(n => n.status === 'approved');
+    $('kpiAdminReports').textContent = reports.length;
+    $('kpiAdminPending').textContent = reports.filter(r => r.status === 'Pending').length;
+    $('kpiAdminResolved').textContent = reports.filter(r => r.status === 'Resolved').length;
+    $('kpiAdminNgos').textContent = approved.length;
+
+    $('adminOverviewBody').innerHTML = reports.length ? reports.slice(0, 5).map(r => `
       <tr>
-        <td>${r.id}</td>
-        <td>${r.reporter}</td>
-        <td>${r.location}</td>
-        <td>${formatDate(r.date)}</td>
+        <td>${reportLink(r)}</td>
+        <td>${esc(r.reporter_name)}</td>
+        <td>${esc(r.location)}</td>
+        <td>${formatDate(r.created_at)}</td>
         <td>${statusBadge(r.status)}</td>
-      </tr>
-    `).join('') : `<tr><td colspan="5" style="text-align:center;color:var(--brown-500);padding:30px;">No reports yet.</td></tr>`;
+      </tr>`).join('') : emptyRow(5, 'No reports yet.');
+
+    tbody.innerHTML = reports.length ? reports.map(r => `
+      <tr>
+        <td>${reportLink(r)}</td>
+        <td>${esc(r.reporter_name)}</td>
+        <td>${esc(r.location)}</td>
+        <td>
+          <select class="assign-select" data-id="${r.id}" style="width:auto;max-width:130px;padding:6px 8px;font-size:0.8rem;">
+            <option value="">—</option>
+            ${approved.map(n => `<option value="${n.id}" ${n.id === r.ngo_id ? 'selected' : ''}>${esc(n.name)}</option>`).join('')}
+          </select>
+        </td>
+        <td>${formatDate(r.created_at)}</td>
+        <td>${statusBadge(r.status)}</td>
+        <td><button class="btn btn-outline btn-sm delete-report" data-id="${r.id}" data-photo="${esc(r.photo_path || '')}">Remove</button></td>
+      </tr>`).join('') : emptyRow(7, 'No reports yet.');
+
+    const ngoBody = $('adminNgosBody');
+    ngoBody.innerHTML = ngos.length ? ngos.map(n => {
+      const assigned = reports.filter(r => r.ngo_id === n.id);
+      const resolved = assigned.filter(r => r.status === 'Resolved');
+      let status;
+      if (n.status === 'approved'){
+        status = `<span class="badge badge-resolved">Active</span>
+          <button class="btn btn-outline btn-sm ngo-status" data-id="${n.id}" data-status="suspended" style="margin-left:6px;">Suspend</button>`;
+      } else {
+        const label = n.status === 'suspended' ? 'Suspended' : 'Awaiting approval';
+        status = `<span class="badge ${n.status === 'suspended' ? 'badge-rejected' : 'badge-pending'}">${label}</span>
+          <button class="btn btn-outline btn-sm ngo-status" data-id="${n.id}" data-status="approved" style="margin-left:6px;">Approve</button>`;
+      }
+      return `
+        <tr>
+          <td>${esc(n.name)}</td>
+          <td>${assigned.length}</td>
+          <td>${resolved.length}</td>
+          <td>${status}</td>
+        </tr>`;
+    }).join('') : emptyRow(4, 'No NGOs have registered yet.');
+
+    $('adminUsersBody').innerHTML = users.length ? users.map(u => `
+      <tr>
+        <td>${esc(u.full_name || u.email)}</td>
+        <td>${esc(u.phone || '—')}</td>
+        <td>${reports.filter(r => r.reporter_id === u.id).length}</td>
+      </tr>`).join('') : emptyRow(3, 'No users yet.');
   }
 
-  // All reports table
-  tbody.innerHTML = reports.map(r => `
-    <tr>
-      <td>${r.id}</td>
-      <td>${r.reporter}</td>
-      <td>${r.location}</td>
-      <td>${r.ngo || '—'}</td>
-      <td>${formatDate(r.date)}</td>
-      <td>${statusBadge(r.status)}</td>
-      <td><button class="btn btn-outline btn-sm delete-report" data-id="${r.id}">Remove</button></td>
-    </tr>
-  `).join('');
+  async function run(promise){
+    const { error } = await promise;
+    if (error) alert(friendlyError(error));
+    await load();
+  }
 
-  tbody.querySelectorAll('.delete-report').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const remaining = getReports().filter(r => r.id !== btn.dataset.id);
-      saveReports(remaining);
-      renderAdminDashboard();
-    });
+  document.addEventListener('change', (e) => {
+    const sel = e.target.closest('.assign-select');
+    if (sel) run(sb.rpc('admin_assign_report', { p_report: sel.dataset.id, p_ngo: sel.value || null }));
   });
 
-  renderAdminNgos(reports);
-  renderAdminUsers(reports);
-}
-
-function renderAdminNgos(reports){
-  const tbody = document.getElementById('adminNgosBody');
-  if (!tbody) return;
-
-  const rows = PARTNER_NGOS.map(name => {
-    const assigned = reports.filter(r => r.ngo === name);
-    const resolved = assigned.filter(r => r.status === 'Resolved');
-    const active = assigned.some(r => r.status === 'Pending' || r.status === 'In Progress');
-    return `
-      <tr>
-        <td>${name}</td>
-        <td>${assigned.length}</td>
-        <td>${resolved.length}</td>
-        <td>${active || assigned.length ? '<span class="badge badge-resolved">Active</span>' : '<span class="badge badge-pending">No cases yet</span>'}</td>
-      </tr>
-    `;
+  document.addEventListener('click', async (e) => {
+    const del = e.target.closest('.delete-report');
+    const ngoBtn = e.target.closest('.ngo-status');
+    if (del){
+      if (!confirm('Permanently remove this report? This cannot be undone.')) return;
+      if (del.dataset.photo) await sb.storage.from(PHOTO_BUCKET).remove([del.dataset.photo]);
+      run(sb.from('reports').delete().eq('id', del.dataset.id));
+    }
+    if (ngoBtn) run(sb.rpc('admin_set_ngo_status', { p_ngo: ngoBtn.dataset.id, p_status: ngoBtn.dataset.status }));
   });
 
-  tbody.innerHTML = rows.join('');
-}
-
-function renderAdminUsers(reports){
-  const tbody = document.getElementById('adminUsersBody');
-  if (!tbody) return;
-
-  const byUser = {};
-  reports.forEach(r => {
-    const key = r.reporter || 'Unknown';
-    if (!byUser[key]) byUser[key] = { phone: r.phone || '—', count: 0 };
-    byUser[key].count += 1;
-  });
-
-  const entries = Object.entries(byUser);
-  tbody.innerHTML = entries.length ? entries.map(([name, info]) => `
-    <tr>
-      <td>${name}</td>
-      <td>${info.phone}</td>
-      <td>${info.count}</td>
-    </tr>
-  `).join('') : `<tr><td colspan="3" style="text-align:center;color:var(--brown-500);padding:30px;">No users yet.</td></tr>`;
+  await load();
 }
 
 function initAdminNav(){
@@ -500,27 +833,16 @@ function initAdminNav(){
 
   function switchView(view){
     document.querySelectorAll('.admin-view').forEach(v => v.style.display = 'none');
-    const target = document.getElementById('view-' + view);
+    const target = $('view-' + view);
     if (target) target.style.display = 'block';
-
     links.forEach(l => l.classList.toggle('active', l.dataset.view === view));
-
-    const title = document.getElementById('adminViewTitle');
-    const subtitle = document.getElementById('adminViewSubtitle');
-    if (title && titles[view]){
-      title.textContent = titles[view][0];
-      subtitle.textContent = titles[view][1];
+    if (titles[view]){
+      $('adminViewTitle').textContent = titles[view][0];
+      $('adminViewSubtitle').textContent = titles[view][1];
     }
   }
 
-  links.forEach(link => {
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      switchView(link.dataset.view);
-    });
-  });
-
-  viewLinks.forEach(link => {
+  [...links, ...viewLinks].forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       switchView(link.dataset.view);
@@ -528,65 +850,70 @@ function initAdminNav(){
   });
 }
 
-function initNgoNav(){
-  const links = document.querySelectorAll('.side-nav a[data-ngo-view]');
-  if (!links.length) return;
+/* ---------------------------------- Contact ---------------------------------- */
 
-  const titles = {
-    'reports-all': ['NGO Dashboard', 'Review incoming reports and manage rescue status.'],
-    'reports-In Progress': ['Active Rescues', 'Cases your team is currently working on.'],
-    'reports-Resolved': ['Resolved Cases', 'Rescues your team has successfully completed.'],
-    'team': ['Our Team', 'People handling rescues for Compassion Paws.']
-  };
-
-  function switchView(view, filter){
-    document.querySelectorAll('.ngo-view').forEach(v => v.style.display = 'none');
-    const target = document.getElementById('ngo-view-' + view);
-    if (target) target.style.display = 'block';
-
-    links.forEach(l => l.classList.remove('active'));
-
-    const title = document.getElementById('ngoViewTitle');
-    const subtitle = document.getElementById('ngoViewSubtitle');
-    const key = view === 'reports' ? 'reports-' + filter : view;
-    if (title && titles[key]){
-      title.textContent = titles[key][0];
-      subtitle.textContent = titles[key][1];
-    }
-
-    if (view === 'reports'){
-      const select = document.getElementById('ngoFilter');
-      if (select){
-        select.value = filter;
-        select.dispatchEvent(new Event('change'));
-      }
-    }
-  }
-
-  links.forEach(link => {
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      link.classList.add('active');
-      switchView(link.dataset.ngoView, link.dataset.filter);
+function initContactForm(){
+  const form = $('contactForm');
+  if (!form) return;
+  const box = $('contactSuccess');
+  const successText = box ? box.innerHTML : '';
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = form.querySelector('button[type="submit"]');
+    setBusy(btn, true, 'Sending…');
+    const { error } = await sb.from('contact_messages').insert({
+      name: $('contactName').value.trim(),
+      email: $('contactEmail').value.trim(),
+      message: $('contactMessage').value.trim()
     });
+    setBusy(btn, false);
+    if (error){ showAlert(box, esc(friendlyError(error))); return; }
+    showAlert(box, successText, 'success');
+    form.reset();
   });
 }
 
-/* ---------------------------------- Init ---------------------------------- */
+/* ------------------------------------ Init ------------------------------------ */
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   initNav();
   initRoleToggle();
   initSeverityChips();
   initFileUpload();
-  initLoginForm();
-  initRegisterForm();
-  initReportForm();
-  renderMyReports();
-  initTrackSearch();
-  renderCitizenDashboard();
-  renderNgoDashboard();
-  renderAdminDashboard();
-  initAdminNav();
-  initNgoNav();
+  initLogoutLinks();
+
+  if (!sb){
+    showConfigBanner();
+    return;
+  }
+
+  // Report IDs in the NGO and admin tables open the details popup.
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-open-report]');
+    if (!el) return;
+    e.preventDefault();
+    openReportModal(el.dataset.openReport);
+  });
+
+  try {
+    initNavSession();
+    initLoginForm();
+    initRegisterForm();
+    initResetPasswordForm();
+    initReportForm();
+    initTrackSearch();
+    initContactForm();
+    await initCitizenDashboard();
+    await initMyReports();
+    await initNgoDashboard();
+    await initAdminDashboard();
+  } catch (err){
+    console.error(err);
+    const main = document.querySelector('.dash-main') || document.querySelector('main');
+    if (main){
+      const box = document.createElement('div');
+      main.prepend(box);
+      showAlert(box, 'Something went wrong loading this page: ' + esc(friendlyError(err)));
+    }
+  }
 });
