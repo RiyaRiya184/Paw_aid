@@ -7,6 +7,6 @@
    ========================================================================== */
 
 window.PAWAID_CONFIG = {
-  SUPABASE_URL: 'https://YOUR-PROJECT-ID.supabase.co',
-  SUPABASE_ANON_KEY: 'YOUR-ANON-PUBLIC-KEY'
+  SUPABASE_URL: 'https://runkfalyjxihtkxczsdl.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1bmtmYWx5anhpaHRreGN6c2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU1MDQzMzQsImV4cCI6MjExMTA4MDMzNH0.vRb-DqyIUV42-vWcATbBExgBgp5jmboxAMbAz6Opqxg'
 };

@@ -417,8 +417,8 @@ grant execute on function public.update_report_status(uuid,text,text) to authent
 grant execute on function public.ngo_release_report(uuid) to authenticated;
 grant execute on function public.admin_assign_report(uuid,uuid) to authenticated;
 grant execute on function public.admin_set_ngo_status(uuid,text) to authenticated;
-grant execute on function public.is_admin() to authenticated;
-grant execute on function public.my_ngo_id() to authenticated;
+grant execute on function public.is_admin() to anon, authenticated;
+grant execute on function public.my_ngo_id() to anon, authenticated;
 grant execute on function public.can_see_report(public.reports) to anon, authenticated;
 
 -- -------------------------------------------------------------------------
