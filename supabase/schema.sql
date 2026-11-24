@@ -481,4 +481,3 @@ create policy "report photos admin delete" on storage.objects for delete to auth
 --
 --    update public.profiles set role = 'admin' where email = 'you@example.com';
 -- -------------------------------------------------------------------------
- update public.profiles set role = 'admin' where email = 'madhumita@gmail.com'
