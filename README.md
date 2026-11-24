@@ -13,7 +13,7 @@ file storage), so everything works across devices and users.
 |---|---|---|
 | **Visitor** (no login) | — | Report a dog, track any report by its ID (e.g. `PA-1001`), send a contact message |
 | **Citizen** | Register → "Citizen" | Everything a visitor can, plus a dashboard and "My Reports" list of their own reports |
-| **NGO** | Register → "NGO" (use the organisation name), then **an admin approves it** | See open cases and their own cases; accept a case and update its status from the **Update** dropdown (choose *In Progress* to accept, *Resolved* / *Rejected* to close, *Pending* to hand it back); click a report ID for the photo, details and reporter's phone |
+| **NGO** | Register → "NGO" (use the organisation name), then **an admin approves it** | See open cases and their own cases; accept a case and update its status from the **Update** dropdown (choose *In Progress* to accept, *Resolved* / *Rejected* to close, *Pending* to hand it back); click a report ID or **📷 View photo** for the photo, details and reporter's phone; manage their **Team** list (add, edit, remove members) |
 | **Admin** | Promote an existing account with one SQL line (below) | See all reports, assign an NGO from the **NGO** dropdown, remove reports, approve / suspend NGOs, view citizens |
 
 Security is enforced by the database itself (Row Level Security in
@@ -93,4 +93,5 @@ To put it online for free, enable **GitHub Pages** for this repository
 ## Where to find other data
 - **Contact form messages** are saved in the `contact_messages` table: open
   **Table Editor → contact_messages** in Supabase.
-- The **Team** list on the NGO dashboard is static sample content in `ngo-dashboard.html`.
+- **NGO team members** are managed by each NGO under **NGO dashboard → Team** and stored in the `ngo_members` table.
+- **Dog photos**: on the NGO and admin dashboards, click a report ID or **📷 View photo** to see the photo, full details and the reporter's phone number.
