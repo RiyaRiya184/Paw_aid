@@ -94,7 +94,14 @@ function emptyRow(cols, html){
 }
 
 function reportLink(r){
-  return `<a href="#" data-open-report="${r.id}">${esc(r.code)}</a>`;
+  return `<a href="#" class="report-link" data-open-report="${r.id}" title="View details and photo">${esc(r.code)}</a>`;
+}
+
+// Description text plus a "View photo" link when the report has a photo.
+function descWithPhoto(r){
+  const photo = r.photo_path
+    ? `<br><a href="#" class="photo-link" data-open-report="${r.id}">📷 View photo</a>` : '';
+  return esc(r.dog_description) + photo;
 }
 
 function showConfigBanner(){
@@ -596,6 +603,7 @@ async function initNgoDashboard(){
   if (error) throw error;
   fillUserChip(ngo ? ngo.name : profile.full_name, 'NGO Partner');
   initNgoNav(ngo ? ngo.name : 'your NGO');
+  if (ngo) initNgoTeam(ngo);
 
   if (!ngo || ngo.status !== 'approved'){
     const msg = ngo && ngo.status === 'suspended'
@@ -610,7 +618,7 @@ async function initNgoDashboard(){
 
   async function load(){
     const { data, error } = await sb.from('reports')
-      .select('id, code, dog_description, location, severity, status, ngo_id, created_at')
+      .select('id, code, dog_description, location, severity, status, ngo_id, photo_path, created_at')
       .order('created_at', { ascending: false });
     if (error) throw error;
     reports = data;
@@ -628,7 +636,7 @@ async function initNgoDashboard(){
     tbody.innerHTML = list.length ? list.map(r => `
       <tr>
         <td>${reportLink(r)}</td>
-        <td>${esc(r.dog_description)}</td>
+        <td>${descWithPhoto(r)}</td>
         <td>${esc(r.location)}</td>
         <td>${esc(r.severity)}</td>
         <td>${formatDate(r.created_at)}</td>
@@ -668,6 +676,123 @@ async function initNgoDashboard(){
 
   $('ngoFilter').addEventListener('change', render);
   await load();
+}
+
+/* -------------------------------- NGO team --------------------------------
+   The Team view lists the NGO's own members (stored in ngo_members).
+   Add with the form under the table; Edit / Remove on each row. */
+
+function initNgoTeam(ngo){
+  const tbody = $('ngoTeamBody');
+  const form = $('teamForm');
+  if (!tbody || !form) return;
+  const alertBox = $('teamAlert');
+  let members = [];
+  let editingId = null;
+
+  async function load(){
+    const { data, error } = await sb.from('ngo_members').select('*').eq('ngo_id', ngo.id).order('created_at');
+    if (error){ showAlert(alertBox, esc(friendlyError(error))); return; }
+    members = data;
+    render();
+  }
+
+  function viewRow(m){
+    return `
+      <tr>
+        <td>${esc(m.name)}</td>
+        <td>${esc(m.role || '—')}</td>
+        <td>${m.cases_handled}</td>
+        <td>${esc(m.contact || '—')}</td>
+        <td class="team-actions">
+          <button type="button" class="btn btn-outline btn-sm" data-edit-member="${m.id}">Edit</button>
+          <button type="button" class="btn btn-outline btn-sm" data-remove-member="${m.id}">Remove</button>
+        </td>
+      </tr>`;
+  }
+
+  function editRow(m){
+    return `
+      <tr data-editing="${m.id}">
+        <td><input type="text" class="team-input" name="name" value="${esc(m.name)}" maxlength="120"></td>
+        <td><input type="text" class="team-input" name="role" value="${esc(m.role)}" maxlength="80"></td>
+        <td><input type="number" class="team-input" name="cases" value="${m.cases_handled}" min="0" max="100000" style="width:80px;"></td>
+        <td><input type="text" class="team-input" name="contact" value="${esc(m.contact)}" maxlength="200"></td>
+        <td class="team-actions">
+          <button type="button" class="btn btn-primary btn-sm" data-save-member="${m.id}">Save</button>
+          <button type="button" class="btn btn-outline btn-sm" data-cancel-edit>Cancel</button>
+        </td>
+      </tr>`;
+  }
+
+  function render(){
+    tbody.innerHTML = members.length
+      ? members.map(m => m.id === editingId ? editRow(m) : viewRow(m)).join('')
+      : emptyRow(5, 'No team members yet. Add your first one using the form below.');
+  }
+
+  function readCases(value){
+    const n = parseInt(value, 10);
+    return Number.isFinite(n) && n >= 0 ? Math.min(n, 100000) : 0;
+  }
+
+  tbody.addEventListener('click', async (e) => {
+    const edit = e.target.closest('[data-edit-member]');
+    const remove = e.target.closest('[data-remove-member]');
+    const save = e.target.closest('[data-save-member]');
+    const cancel = e.target.closest('[data-cancel-edit]');
+    hideAlert(alertBox);
+
+    if (edit){ editingId = edit.dataset.editMember; render(); return; }
+    if (cancel){ editingId = null; render(); return; }
+
+    if (remove){
+      const m = members.find(x => x.id === remove.dataset.removeMember);
+      if (!confirm(`Remove ${m ? m.name : 'this member'} from your team?`)) return;
+      const { error } = await sb.from('ngo_members').delete().eq('id', remove.dataset.removeMember);
+      if (error) showAlert(alertBox, esc(friendlyError(error)));
+      await load();
+      return;
+    }
+
+    if (save){
+      const row = save.closest('tr');
+      const val = name => row.querySelector(`[name="${name}"]`).value.trim();
+      if (!val('name')){ showAlert(alertBox, 'Name cannot be empty.'); return; }
+      setBusy(save, true, 'Saving…');
+      const { error } = await sb.from('ngo_members').update({
+        name: val('name'),
+        role: val('role'),
+        cases_handled: readCases(val('cases')),
+        contact: val('contact')
+      }).eq('id', save.dataset.saveMember);
+      if (error){ setBusy(save, false); showAlert(alertBox, esc(friendlyError(error))); return; }
+      editingId = null;
+      await load();
+      showAlert(alertBox, 'Team member updated.', 'success');
+    }
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideAlert(alertBox);
+    const btn = form.querySelector('button[type="submit"]');
+    setBusy(btn, true, 'Adding…');
+    const { error } = await sb.from('ngo_members').insert({
+      ngo_id: ngo.id,
+      name: $('memberName').value.trim(),
+      role: $('memberRole').value.trim(),
+      cases_handled: readCases($('memberCases').value),
+      contact: $('memberContact').value.trim()
+    });
+    setBusy(btn, false);
+    if (error){ showAlert(alertBox, esc(friendlyError(error))); return; }
+    form.reset();
+    await load();
+    showAlert(alertBox, 'Team member added.', 'success');
+  });
+
+  load();
 }
 
 function initNgoNav(ngoName){
@@ -741,7 +866,7 @@ async function initAdminDashboard(){
 
     $('adminOverviewBody').innerHTML = reports.length ? reports.slice(0, 5).map(r => `
       <tr>
-        <td>${reportLink(r)}</td>
+        <td>${reportLink(r)}${r.photo_path ? `<br><a href="#" class="photo-link" data-open-report="${r.id}">📷 Photo</a>` : ''}</td>
         <td>${esc(r.reporter_name)}</td>
         <td>${esc(r.location)}</td>
         <td>${formatDate(r.created_at)}</td>
@@ -750,7 +875,7 @@ async function initAdminDashboard(){
 
     tbody.innerHTML = reports.length ? reports.map(r => `
       <tr>
-        <td>${reportLink(r)}</td>
+        <td>${reportLink(r)}${r.photo_path ? `<br><a href="#" class="photo-link" data-open-report="${r.id}">📷 Photo</a>` : ''}</td>
         <td>${esc(r.reporter_name)}</td>
         <td>${esc(r.location)}</td>
         <td>

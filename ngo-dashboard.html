@@ -99,16 +99,19 @@
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>Name</th><th>Role</th><th>Cases handled</th><th>Contact</th></tr>
+              <tr><th>Name</th><th>Role</th><th>Cases handled</th><th>Contact</th><th></th></tr>
             </thead>
-            <tbody id="ngoTeamBody">
-              <tr><td>Rina Verma</td><td>Rescue Coordinator</td><td>32</td><td>rina@compassionpaws.org</td></tr>
-              <tr><td>Sanjay Mehta</td><td>Field Rescuer</td><td>48</td><td>sanjay@compassionpaws.org</td></tr>
-              <tr><td>Priya Nair</td><td>Veterinary Lead</td><td>27</td><td>priya@compassionpaws.org</td></tr>
-              <tr><td>Farhan Ali</td><td>Field Rescuer</td><td>19</td><td>farhan@compassionpaws.org</td></tr>
-            </tbody>
+            <tbody id="ngoTeamBody"></tbody>
           </table>
         </div>
+        <form id="teamForm" class="team-form">
+          <input type="text" id="memberName" placeholder="Name" maxlength="120" required>
+          <input type="text" id="memberRole" placeholder="Role, e.g. Field Rescuer" maxlength="80">
+          <input type="number" id="memberCases" placeholder="Cases" min="0" max="100000">
+          <input type="text" id="memberContact" placeholder="Email or phone" maxlength="200">
+          <button type="submit" class="btn btn-primary btn-sm">Add member</button>
+        </form>
+        <div id="teamAlert" class="alert"></div>
       </div>
     </div>
   </main>

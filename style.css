@@ -755,3 +755,20 @@ footer .brand{ color: var(--paper); }
   background: var(--red-100); color: var(--red-600);
   padding: 10px 16px; font-size: 0.88rem; text-align: center;
 }
+
+/* Clickable report IDs and photo links (NGO + admin dashboards) */
+.report-link{ color: var(--orange-700); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.photo-link{ display: inline-block; margin-top: 4px; font-size: 0.8rem; font-weight: 600; color: var(--orange-700); }
+.photo-link:hover, .report-link:hover{ color: var(--orange-600); }
+
+/* NGO team members: add form and inline editing */
+.team-form{
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--cream-2);
+}
+.team-form input{ flex: 1 1 150px; width: auto; }
+.team-form input[type="number"]{ flex: 0 1 100px; }
+.team-input{ padding: 7px 9px; font-size: 0.85rem; min-width: 90px; }
+.team-actions{ white-space: nowrap; }
+.team-actions .btn + .btn{ margin-left: 6px; }
+#teamAlert{ margin-top: 14px; margin-bottom: 0; }

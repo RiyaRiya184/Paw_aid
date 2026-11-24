@@ -422,6 +422,37 @@ grant execute on function public.my_ngo_id() to anon, authenticated;
 grant execute on function public.can_see_report(public.reports) to anon, authenticated;
 
 -- -------------------------------------------------------------------------
+-- NGO team members: each NGO manages its own list; admins can read all.
+-- -------------------------------------------------------------------------
+
+create table if not exists public.ngo_members (
+  id            uuid primary key default gen_random_uuid(),
+  ngo_id        uuid not null references public.ngos(id) on delete cascade,
+  name          text not null check (length(name) between 1 and 120),
+  role          text not null default '' check (length(role) <= 80),
+  contact       text not null default '' check (length(contact) <= 200),
+  cases_handled integer not null default 0 check (cases_handled between 0 and 100000),
+  created_at    timestamptz not null default now()
+);
+
+create index if not exists ngo_members_ngo_idx on public.ngo_members(ngo_id);
+
+alter table public.ngo_members enable row level security;
+
+drop policy if exists members_select on public.ngo_members;
+create policy members_select on public.ngo_members for select
+  using (public.is_admin()
+         or exists (select 1 from public.ngos n where n.id = ngo_id and n.owner_id = auth.uid()));
+
+drop policy if exists members_owner_write on public.ngo_members;
+create policy members_owner_write on public.ngo_members for all
+  using (exists (select 1 from public.ngos n where n.id = ngo_id and n.owner_id = auth.uid()))
+  with check (exists (select 1 from public.ngos n where n.id = ngo_id and n.owner_id = auth.uid()));
+
+revoke all on public.ngo_members from anon, authenticated;
+grant select, insert, update, delete on public.ngo_members to authenticated;
+
+-- -------------------------------------------------------------------------
 -- Photo storage: public bucket, images only, 5 MB max.
 -- Uploads must go to reports/<random>.<ext>; nobody can overwrite or delete
 -- except admins.
